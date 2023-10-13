@@ -1,6 +1,6 @@
 module github.com/ac0d3r/wxapkg
 
-go 1.21.1
+go 1.20
 
 require (
 	github.com/ditashi/jsbeautifier-go v0.0.0-20141206144643-2520a8026a9c
