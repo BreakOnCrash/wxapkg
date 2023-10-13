@@ -21,7 +21,7 @@ func New() *cli.App {
 	app := cli.NewApp()
 	app.Name = "wxapkg"
 	app.Usage = "wxapkg analysis tool for macos"
-	app.Version = "v0.0.1"
+	app.Version = "v0.0.2"
 	app.Commands = []*cli.Command{
 		{
 			Name:  "unpack",
@@ -29,6 +29,8 @@ func New() *cli.App {
 			Flags: []cli.Flag{
 				&cli.StringFlag{Name: "in", Required: true, Usage: ".wxapkg file path"},
 				&cli.StringFlag{Name: "out", Required: false, Value: "./unpack_out", Usage: "unpacked output path"},
+				&cli.BoolFlag{Name: "format", Value: false, Usage: "format content (e.g. js html json)"},
+				&cli.BoolFlag{Name: "v", Value: false, Usage: "more info"},
 			},
 			Action: unpack,
 		},
@@ -50,9 +52,18 @@ func New() *cli.App {
 func unpack(c *cli.Context) error {
 	in := c.String("in")
 	out := c.String("out")
+	v := c.Bool("v")
+	format := c.Bool("format")
 
 	info_.Printf("[+] unpacking %s -> %s \n", in, out)
-	err := wxapkg.Unpack(in, out)
+	var infof func(format string, a ...interface{}) = nil
+	if v {
+		infof = func(format string, a ...interface{}) {
+			info_.Printf(format, a...)
+		}
+	}
+
+	err := wxapkg.Unpack(in, out, format, infof)
 	if err != nil {
 		if errors.Is(err, wxapkg.ErrInvalidWXAPkg) {
 			err_.Printf("[-] '%s' %s\n", in, err.Error())

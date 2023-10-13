@@ -5,8 +5,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 const (
@@ -33,7 +35,7 @@ var (
 	ErrInvalidWXAPkg = errors.New("invalid wxapkg file")
 )
 
-func Unpack(file, output string) error {
+func Unpack(file, output string, format bool, printf func(format string, a ...interface{})) error {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return err
@@ -51,48 +53,57 @@ func Unpack(file, output string) error {
 		return ErrInvalidWXAPkg
 	}
 
-	fis := make([]*FileIndex, 0, header.FileCount)
-	for i := 0; i < int(header.FileCount); i++ {
-		// get filename length
-		var namelen uint32
-		if err := binary.Read(r, binary.BigEndian, &namelen); err != nil {
-			return err
-		}
+	fis := make(chan *FileIndex)
+	go func() {
+		defer close(fis)
 
-		fi := new(FileIndex)
-		// get filename
-		n := make([]byte, namelen)
-		_, err := io.ReadAtLeast(r, n, int(namelen))
-		if err != nil {
-			return err
-		}
+		for i := 0; i < int(header.FileCount); i++ {
+			// get filename length
+			var namelen uint32
+			if err = binary.Read(r, binary.BigEndian, &namelen); err != nil {
+				return
+			}
 
-		fi.Name = string(n)
-		if err = binary.Read(r, binary.BigEndian, &fi.Offset); err != nil {
-			return err
-		}
-		if err = binary.Read(r, binary.BigEndian, &fi.Size); err != nil {
-			return err
-		}
+			fi := new(FileIndex)
+			// get filename
+			n := make([]byte, namelen)
+			_, err := io.ReadAtLeast(r, n, int(namelen))
+			if err != nil {
+				return
+			}
 
-		fis = append(fis, fi)
-	}
+			fi.Name = string(n)
+			if err = binary.Read(r, binary.BigEndian, &fi.Offset); err != nil {
+				return
+			}
+			if err = binary.Read(r, binary.BigEndian, &fi.Size); err != nil {
+				return
+			}
 
-	for _, fi := range fis {
+			fis <- fi
+		}
+	}()
+
+	checkDir := CacheCheckDir()
+	for fi := range fis {
 		path := filepath.Join(output, fi.Name)
-		if err := CheckDir(path); err != nil {
+		if err = checkDir(path); err != nil {
 			return err
 		}
 		// get file contents
 		content := SafetyGetData(data, fi.Offset, fi.Size)
 		// format content
-		content = Format(path, content)
+		if format {
+			content = Format(path, content)
+		}
+		if printf != nil {
+			printf("\t file:%s, content-length:%d\n", fi.Name, len(content))
+		}
 		if err := os.WriteFile(path, content, 0o600); err != nil {
 			return err
 		}
 	}
-
-	return nil
+	return err
 }
 
 func SafetyGetData(data []byte, offset, size uint32) []byte {
@@ -102,22 +113,38 @@ func SafetyGetData(data []byte, offset, size uint32) []byte {
 	return data[offset : offset+size]
 }
 
-func CheckDir(path string) error {
-	path = filepath.Dir(path)
-	stat, err := os.Stat(path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			goto NotExist
+func CacheCheckDir() func(path string) error {
+	var cache sync.Map
+
+	return func(path string) (err error) {
+		if _, ok := cache.Load(path); ok { // path checked
+			return nil
 		}
-		return err
-	}
 
-	if stat.IsDir() {
-		return nil
-	}
+		defer func() {
+			if err == nil {
+				cache.Store(path, struct{}{})
+			}
+		}()
 
-NotExist:
-	return os.MkdirAll(path, os.ModePerm)
+		var stat fs.FileInfo
+		path = filepath.Dir(path)
+		stat, err = os.Stat(path)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				goto NotExist
+			}
+			return err
+		}
+
+		if stat.IsDir() {
+			return nil
+		}
+
+	NotExist:
+		err = os.MkdirAll(path, os.ModePerm)
+		return
+	}
 }
 
 func Format(ext string, data []byte) []byte {
