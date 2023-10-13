@@ -1,9 +1,14 @@
 # wxapkg
 
-wxapkg analysis tool for macos
+.wxapkg analysis tool for macOS
 
-## install
+## Install
 
 ```bash
 go install github.com/ac0d3r/wxapkg/cmd/wxapkgx@latest
 ```
+
+## Featrue
+- unpack *.wxapkg
+- list WeChat *.wxapkg files
+- debug webview with Safari (TODO)
