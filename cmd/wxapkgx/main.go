@@ -82,6 +82,7 @@ func list(c *cli.Context) error {
 
 	stat, err := os.Stat(root)
 	if err != nil {
+		err_.Println("[-] not support WeChat version")
 		return err
 	}
 
@@ -108,6 +109,11 @@ func list(c *cli.Context) error {
 
 		return nil
 	})
+}
+
+func debug(c *cli.Context) error {
+
+	return nil
 }
 
 func getTabTree(tab int) string {
