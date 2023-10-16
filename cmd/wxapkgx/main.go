@@ -21,7 +21,7 @@ func New() *cli.App {
 	app := cli.NewApp()
 	app.Name = "wxapkg"
 	app.Usage = "wxapkg analysis tool for macos"
-	app.Version = "v0.0.2"
+	app.Version = "v0.0.1"
 	app.Commands = []*cli.Command{
 		{
 			Name:  "unpack",
@@ -39,10 +39,6 @@ func New() *cli.App {
 			Usage:  "list macOS Wechat .wxapkg file",
 			Flags:  []cli.Flag{},
 			Action: list,
-		},
-		{
-			Name:  "debug",
-			Usage: "start debug webview (TODO)",
 		},
 	}
 
@@ -109,11 +105,6 @@ func list(c *cli.Context) error {
 
 		return nil
 	})
-}
-
-func debug(c *cli.Context) error {
-
-	return nil
 }
 
 func getTabTree(tab int) string {
