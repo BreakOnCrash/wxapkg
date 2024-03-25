@@ -2,9 +2,9 @@ package main
 
 import (
 	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ac0d3r/wxapkg"
 	"github.com/fatih/color"
@@ -77,42 +77,24 @@ func list(c *cli.Context) error {
 	info_.Printf("list %s\n", root)
 
 	stat, err := os.Stat(root)
-	if err != nil {
+	if err != nil || !stat.IsDir() {
 		err_.Println("[-] not support WeChat version")
 		return err
 	}
 
-	if !stat.IsDir() {
-		err_.Println("[-] not support WeChat version")
-		return nil
+	dirs, err := os.ReadDir(root)
+	if err != nil {
+		return err
 	}
-
-	var tab int
-	return filepath.Walk(root, func(path string, info fs.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			if path == root {
-				return nil
+	for _, dir := range dirs {
+		if dir.IsDir() {
+			if strings.HasPrefix(dir.Name(), "wx") {
+				info_.Printf("- %s\n", filepath.Join(root, dir.Name()))
 			}
-
-			tab++
-			info_.Printf("%s%s\n", getTabTree(tab), path)
-		} else {
-			info_.Printf("%s%s\n", getTabTree(tab), path)
 		}
-
-		return nil
-	})
-}
-
-func getTabTree(tab int) string {
-	s := ""
-	for i := 0; i < tab; i++ {
-		s += "\t"
 	}
-	return s
+
+	return nil
 }
 
 func main() {
